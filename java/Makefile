@@ -3,7 +3,6 @@ install: test
 	./gradlew install
 
 publish-snapshot: clean
-	echo repoKey=muon-snapshot>>gradle.properties
 	./gradlew artifactoryPublish
 
 publish: clean
