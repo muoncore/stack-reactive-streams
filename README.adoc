@@ -12,7 +12,7 @@ Muon has several such stacks, covering different scenarios and tasks, letting yo
 
 Reactive streams is a cross industry initiative to enable streaming systems to interoperate within the JVM.
 
-It defines a set of
+It defines a set of Java interfaces that various streaming technologies can use to exchange data between each other in a standardised manner. These interfaces have become so successful that they have been adopted into the Java standard library as of Java 9.
 
 ## Using this stack
 
