@@ -1,8 +1,169 @@
 # Reactive Streams Muon Stack
 
-This stack adds Reactive Streams support to Muon libraries
+## What is a Muon Stack?
 
-It contains
+Muon is a set of libraries and services that let you build highly effective distributed systems that are message and event oriented.
 
-* The core protocol definition, written as a JSProtocol
-* Stack implementations for Jaavscript and Java muons
+Muon is structured as a set of libraries, known as `muon-core` that give a set of infrastructure for building messaging systems. These are available in multiple languages and handle the concerns of discovery, transport, encoding and managing failures. On top of these, the exact messaging semantics that you want to express are built. These are built as a "stack", a set of channels, agents and finally a user facing API that you will use in your application code.
+
+Muon has several such stacks, covering different scenarios and tasks, letting you communicate in various ways, highly distributed, cross platform and taking advantage of best of breed infrastructure and technologies.
+
+## What is Reactive Streams?
+
+Reactive streams is a cross industry initiative to enable streaming systems to interoperate within the JVM.
+
+It defines a set of
+
+## Using this stack
+
+This stack enables you to expose and consume reactive stream endpoints on a network. It takes the communication definition of the Reactive Streams interfaces and maps it into Muon messaging.
+
+It provides a server stack that you can attach to an existing `Publisher` and then consume it remotely using a compatible `Subscriber`. As Muon is cross platform/ polyglot, it also allows you to consume and provide RS endpoints on platforms other than the JVM.
+
+### JVM
+
+To use the stack in Java, first import Muon and the RS stack
+
+*build.gradle*
+[source, groovy]
+----
+repositories {
+    jcenter()
+    maven { url 'https://simplicityitself.artifactoryonline.com/simplicityitself/muon' }
+    maven { url 'https://simplicityitself.artifactoryonline.com/simplicityitself/muon-snapshot' }
+}
+
+dependencies {
+    compile "io.muoncore:muon-core:$muonVersion"
+    compile "io.muoncore:muon-transport-amqp:$muonVersion"
+    compile "io.muoncore:muon-discovery-amqp:$muonVersion"
+    compile "io.muoncore.protocol:stack-reactive-streams:0.0.1-SNAPSHOT"
+}
+----
+
+#### Create a Reactive Stream server
+
+This stack allows you to expose an existing RS `Publisher` so that it can be subscribed to remotely, and exchange all the signals defined for Reactive Streams (including most importantly, the back pressure signals)
+
+First then, you need to be able to obtain a Publisher. If you don't have one already, use a FRP system of some kind to make one. Consider using Spring Reactor, Akka Streams or RxJava, amongst others.
+
+Once you have a Publisher, you can use Muon to network it.
+
+[source, java]
+----
+
+Publisher publisher = .. your publisher ..
+Muon muon = .. create a muon ..;
+
+ReactiveStreamServer rs = new ReactiveStreamServer(muon);
+
+rs.publishSource(
+        "/mystream",                        <1>
+        PublisherLookup.PublisherType.HOT   <2>
+        publisher);
+----
+<1> The name of the stream on the network
+<2> Indicate whether is is a cold or hot stream.
+
+This will now be available. You can check this using the Muon CLI.
+
+```
+
+muon stream stream://<your-service>/mystream --raw
+
+```
+
+You can also generate Publisher instances on demand, if you want to parameterise your streams before they
+are used
+
+[source, java]
+----
+
+Publisher publisher = .. your publisher ..
+Muon muon = .. create a muon ..;
+
+ReactiveStreamServer rs = new ReactiveStreamServer(muon);
+
+rs.publishGeneratedSource(
+                "/ticktock",
+                PublisherLookup.PublisherType.HOT,
+                reactiveStreamSubscriptionRequest -> {    <1>
+                    Publisher mypub = null; //            <2>
+                    return mypub;
+                });
+----
+<1> Factory function to create a Publisher, with the parameters passed available.
+<2> Create or obtain a Publisher instance to satisfy the request.
+
+#### Create a Reactive Stream client
+
+Creating a client is just as simple. Firstly you need a `Subscriber` that you can use. There are many implementations, or you can code it yourself.
+
+[source, java]
+----
+
+Subscriber<StreamData> subscriber = .. your subscriber ..
+Muon muon = .. create a muon ..;
+
+ReactiveStreamClient rs = new ReactiveStreamClient(muon);
+
+rs.subscribe(
+        new URI("stream://<your-service>/mystream"),   <1>
+        subscriber);
+----
+<1> The target endpoint to susbcribe to
+
+Even if you use this stack purely between Java services, this extends the capability of Reactive Streams across the network, allowing you to stream data between JVM processes easily, and translate the back pressure signals easily.
+
+### Node.js
+
+Currently, only the the RS client stack is implemented in JavaScript.
+
+To use this, import Muon and the stack
+
+```
+npm install --save muon-core@next
+npm install --save muon-stack-reactive-streams@next
+```
+
+Then, create a Muon instance and RS client
+
+*index.js*
+[source, javascript]
+----
+var Muon = require("muon-core")
+
+var muonurl = process.env.MUON_URL || "amqp://muon:microservices@localhost"
+
+var muon = Muon.create("hello-world-node", muonurl);           <1>
+
+require("muon-stack-reactive-streams").create(muon)            <2>
+
+muon.subscribe("stream://hello-world-jvm/ticktock",{},         <3>
+    function(data) {
+        console.dir("Data..." + JSON.stringify(data))
+    },
+    function(error) {
+        console.dir(error)
+    },
+    function() {
+        logger.warn("Stream Completed")
+    }
+)
+
+----
+<1> Create a new Muon instance, connecting to a local AMQP broker for discovery and transport
+<2> Add the reactive streams stack.
+<3> Use the added `susbcribe` method to subscribe to the given endpoint.
+
+The above API maps the various RS signals onto javascript callback functions. It internally manages back pressure signalling.
+
+## Getting involved/ adding to this stack.
+
+Additions and extensions to this stack are very welcome.
+
+Particularly of interest are :-
+
+* Added language support
+* Adding the javascript server stack
+* Integrate with javascript FRP libraries.
