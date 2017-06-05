@@ -1,3 +1,10 @@
+|===
+| Master Build | License
+| image:https://img.shields.io/teamcity/http/teamcity.simplicityitself.com/e/OpenSource_MuonReleases_Libraries_StackStreamSnapshot.svg[Status]
+| image:https://img.shields.io/github/license/muoncore/stack-reactive-streams.svg[]
+|===
+
+
 # Reactive Streams Muon Stack
 
 ## What is a Muon Stack?
