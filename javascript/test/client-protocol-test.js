@@ -34,6 +34,7 @@ describe("streaming client protocol", function () {
         transchannel.rightConnection().listen(function(msg) {
             console.log("stream subscribe");
             console.dir(msg);
+            assert.equal(msg.target_service, targetService);
             assert.equal(msg.protocol, 'reactive-stream');
             assert.equal(msg.step, 'SubscriptionRequested');
             done();

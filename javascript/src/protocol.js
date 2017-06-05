@@ -31,32 +31,7 @@ exports.getApi = function (name, infra) {
         endpoints: function () {
           return [];
         },
-        replay: function(streamName, config, clientCallback, errorCallback, completeCallback) {
-            var ret = {}
-            var muon = this
-            infra.discovery.discoverServices(function(services) {
-                var store = services.findServiceWithTags(["eventstore"])
-
-                if (store == null || store == undefined) {
-                  errorCallback({
-                    status: "FAILED",
-                    cause: "No event store could be found, is Photon running?"
-                  })
-                  return
-                }
-
-                config['stream-name'] = streamName
-
-                logger.debug("Found event store: " +JSON.stringify(store))
-
-                var subscriber = muon.subscribe("stream://" + store.identifier + "/stream", config, clientCallback, errorCallback, completeCallback)
-
-                ret.cancel = subscriber.cancel
-            })
-            return ret
-        },
         subscribe: function (remoteServiceUrl, params, clientCallback, errorCallback, completeCallback) {
-
             infra.getTransport().then(function(transport) {
                 try {
                     logger.debug("Subscribing to " + remoteServiceUrl + " with params " + JSON.stringify(params))
