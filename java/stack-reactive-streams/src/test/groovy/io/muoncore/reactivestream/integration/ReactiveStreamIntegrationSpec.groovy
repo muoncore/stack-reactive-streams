@@ -8,7 +8,9 @@ import io.muoncore.codec.json.JsonOnlyCodecs
 import io.muoncore.config.AutoConfiguration
 import io.muoncore.memory.discovery.InMemDiscovery
 import io.muoncore.memory.transport.InMemTransport
+import io.muoncore.protocol.reactivestream.client.ReactiveStreamClient
 import io.muoncore.protocol.reactivestream.server.PublisherLookup
+import io.muoncore.protocol.reactivestream.server.ReactiveStreamServer
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -36,7 +38,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
         }
 
         def muon1 = muon("simples")
-        def muon2 = muon("tombola")
+        def muon2 = client("tombola")
 
         muon1.publishSource("somedata", PublisherLookup.PublisherType.HOT, b)
 
@@ -80,7 +82,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
         }
 
         def muon1 = muon("simples")
-        def muon2 = muon("tombola")
+        def muon2 = client("tombola")
 
         when:
         muon2.subscribe(new URI("stream://simples/BADSTREAM"), sub)
@@ -94,7 +96,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
     def "data remains in order"() {
 
         def muon1 = muon("simples")
-        def muon2 = muon("tombola")
+        def muon2 = client("tombola")
 
         StandardAsyncChannel.echoOut = true
         def env = Environment.initializeIfEmpty()
@@ -138,7 +140,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
     def "client receives complete signal correctly"() {
 
         def muon1 = muon("simples")
-        def muon2 = muon("tombola")
+        def muon2 = client("tombola")
 
         StandardAsyncChannel.echoOut = true
         def env = Environment.initializeIfEmpty()
@@ -208,10 +210,21 @@ class ReactiveStreamIntegrationSpec extends Specification {
     }
 
 
-    Muon muon(name) {
+  ReactiveStreamServer muon(name) {
         def config = new AutoConfiguration(serviceName: name)
         def transport = new InMemTransport(config, eventbus)
 
-        new MultiTransportMuon(config, discovery, [transport], new JsonOnlyCodecs())
+        def muon = new MultiTransportMuon(config, discovery, [transport], new JsonOnlyCodecs())
+
+      new ReactiveStreamServer(muon)
     }
+
+  ReactiveStreamClient client(name) {
+    def config = new AutoConfiguration(serviceName: name)
+    def transport = new InMemTransport(config, eventbus)
+
+    def muon = new MultiTransportMuon(config, discovery, [transport], new JsonOnlyCodecs())
+
+    new ReactiveStreamClient(muon)
+  }
 }
