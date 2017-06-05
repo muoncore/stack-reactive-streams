@@ -10,4 +10,5 @@ publish-snapshot:
 	git push origin
 
 test:
+	npm install
 	npm run test
