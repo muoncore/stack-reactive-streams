@@ -1,6 +1,6 @@
 {
   "name": "muon-stack-reactive-streams",
-  "version": "0.0.2-20",
+  "version": "0.0.2-21",
   "description": "",
   "main": "./distribution/protocol.js",
   "scripts": {
