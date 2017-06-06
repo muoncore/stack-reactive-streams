@@ -186,4 +186,4 @@ Muon has a commercial-friendly license allowing private forks and closed modific
 
 This will enable you to use Muon in any situation where your legal team will not accept a Free Software license.
 
-Please see http://muoncore.io/pro/ for more detail.  You can find the commercial license terms in COMM-LICENSE.
+Please see http://muoncore.io/pro/ for more detail.  You can find the commercial license terms in link:COMM-LICENSE[]
