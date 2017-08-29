@@ -17,6 +17,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class ReactiveStreamServerChannel implements ChannelConnection<MuonInboundMessage, MuonOutboundMessage> {
 
@@ -29,6 +31,8 @@ public class ReactiveStreamServerChannel implements ChannelConnection<MuonInboun
     private Discovery discovery;
 
     private List<String> acceptedContentTypes;
+    //TODO, rationalise into the central dispatcher
+    private Executor exec = Executors.newCachedThreadPool();
 
     public ReactiveStreamServerChannel(
             PublisherLookup publisherLookup,
@@ -52,25 +56,27 @@ public class ReactiveStreamServerChannel implements ChannelConnection<MuonInboun
             return;
         }
 
+      exec.execute(() -> {
         switch(message.getStep()) {
-            case ProtocolMessages.SUBSCRIBE:
-                handleSubscribe(message);
-                break;
-            case ProtocolMessages.REQUEST:
-                handleRequest(message);
-                break;
-            case ProtocolMessages.CANCEL:
-                handleCancel(message);
-                break;
-            case TransportEvents.CONNECTION_FAILURE:
-                handleError();
-                break;
-            case "ChannelShutdown":
-                handleError();
-                break;
-            default:
-                sendProtocolFailureException(message);
+          case ProtocolMessages.SUBSCRIBE:
+            handleSubscribe(message);
+            break;
+          case ProtocolMessages.REQUEST:
+            handleRequest(message);
+            break;
+          case ProtocolMessages.CANCEL:
+            handleCancel(message);
+            break;
+          case TransportEvents.CONNECTION_FAILURE:
+            handleError();
+            break;
+          case "ChannelShutdown":
+            handleError();
+            break;
+          default:
+            sendProtocolFailureException(message);
         }
+      });
     }
 
     private void sendProtocolFailureException(MuonInboundMessage msg) {
