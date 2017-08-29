@@ -1,5 +1,13 @@
 # Change Log
 
+## [Unreleased](https://github.com/muoncore/stack-reactive-streams/tree/HEAD)
+
+[Full Changelog](https://github.com/muoncore/stack-reactive-streams/compare/v0.0.1...HEAD)
+
+**Closed issues:**
+
+- JVM protocol does subscription work on the event dispatch thread. Potential for deadlock [\#2](https://github.com/muoncore/stack-reactive-streams/issues/2)
+
 ## [v0.0.1](https://github.com/muoncore/stack-reactive-streams/tree/v0.0.1) (2017-06-25)
 
 
