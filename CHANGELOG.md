@@ -1,8 +1,7 @@
 # Change Log
 
-## [Unreleased](https://github.com/muoncore/stack-reactive-streams/tree/HEAD)
-
-[Full Changelog](https://github.com/muoncore/stack-reactive-streams/compare/v0.0.1...HEAD)
+## [v0.0.2](https://github.com/muoncore/stack-reactive-streams/tree/v0.0.2) (2017-08-29)
+[Full Changelog](https://github.com/muoncore/stack-reactive-streams/compare/v0.0.1...v0.0.2)
 
 **Closed issues:**
 
