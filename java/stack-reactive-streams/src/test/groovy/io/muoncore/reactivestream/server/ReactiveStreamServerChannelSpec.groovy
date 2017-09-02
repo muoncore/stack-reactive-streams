@@ -1,6 +1,7 @@
 package io.muoncore.reactivestream.server
 
 import io.muoncore.Discovery
+import io.muoncore.Muon
 import io.muoncore.channel.ChannelConnection
 import io.muoncore.codec.json.GsonCodec
 import io.muoncore.codec.json.JsonOnlyCodecs
@@ -12,6 +13,7 @@ import io.muoncore.protocol.reactivestream.messages.ReactiveStreamSubscriptionRe
 import io.muoncore.protocol.reactivestream.messages.RequestMessage
 import io.muoncore.protocol.reactivestream.server.ImmediatePublisherGenerator
 import io.muoncore.protocol.reactivestream.server.PublisherLookup
+import io.muoncore.protocol.reactivestream.server.ReactiveStreamJSServerStack
 import io.muoncore.protocol.reactivestream.server.ReactiveStreamServerChannel
 import io.muoncore.protocol.reactivestream.server.ReactiveStreamServerStack
 import org.reactivestreams.Publisher
@@ -25,6 +27,10 @@ class ReactiveStreamServerChannelSpec extends Specification {
         getCodecsForService(_) >> { ["application/json"] as String[] }
     }
     def codecs = new JsonOnlyCodecs()
+
+    Muon muon = Mock(Muon) {
+      getCodecs() >> codecs
+    }
 
     def "sends ACK if the publisher does exist on SUBSCRIBE"() {
         def subscription = Mock(Subscription)
@@ -42,7 +48,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         }
         def function = Mock(ChannelConnection.ChannelFunction)
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -56,7 +62,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
                         .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
                         .buildInbound())
 
-        then: "NACK sent back"
+        then: "ACK sent back"
         1 * function.apply({ MuonMessage msg ->
             msg.step == ProtocolMessages.ACK
         })
@@ -71,7 +77,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         def function = Mock(ChannelConnection.ChannelFunction)
         def config = new AutoConfiguration(serviceName: "awesome")
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -105,7 +111,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         }
         def function = Mock(ChannelConnection.ChannelFunction)
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -147,7 +153,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         }
         def function = Mock(ChannelConnection.ChannelFunction)
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -190,7 +196,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         }
         def function = Mock(ChannelConnection.ChannelFunction)
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -231,7 +237,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         }
         def function = Mock(ChannelConnection.ChannelFunction)
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -271,7 +277,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
         }
         def function = Mock(ChannelConnection.ChannelFunction)
 
-        def channel = new ReactiveStreamServerChannel(publookup, codecs, config, discovery)
+        def channel = channel(publookup)
         channel.receive(function)
 
         when: "SUBSCRIBE from client"
@@ -295,4 +301,8 @@ class ReactiveStreamServerChannelSpec extends Specification {
                     msg.targetServiceName == "tombola"
         })
     }
+
+  def channel(PublisherLookup lookup) {
+    new ReactiveStreamJSServerStack(muon, lookup).createChannel()
+  }
 }
