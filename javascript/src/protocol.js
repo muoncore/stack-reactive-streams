@@ -1,6 +1,6 @@
 
 var nodeUrl = require("url");
-var uuid = require('node-uuid');
+var uuid = require('uuid');
 require('sexylog');
 var _ = require("underscore")
 var proto = require("./client-protocol")
