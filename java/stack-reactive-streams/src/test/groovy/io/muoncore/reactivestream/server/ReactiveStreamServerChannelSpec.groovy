@@ -11,11 +11,8 @@ import io.muoncore.message.MuonMessageBuilder
 import io.muoncore.protocol.reactivestream.ProtocolMessages
 import io.muoncore.protocol.reactivestream.messages.ReactiveStreamSubscriptionRequest
 import io.muoncore.protocol.reactivestream.messages.RequestMessage
-import io.muoncore.protocol.reactivestream.server.DefaultPublisherLookup
 import io.muoncore.protocol.reactivestream.server.ImmediatePublisherGenerator
 import io.muoncore.protocol.reactivestream.server.PublisherLookup
-import io.muoncore.protocol.reactivestream.server.ReactiveStreamJSServerStack
-import io.muoncore.protocol.reactivestream.server.ReactiveStreamServerChannel
 import io.muoncore.protocol.reactivestream.server.ReactiveStreamServerStack
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
@@ -24,285 +21,301 @@ import spock.lang.Specification
 
 class ReactiveStreamServerChannelSpec extends Specification {
 
-    def discovery = Mock(Discovery) {
-        getCodecsForService(_) >> { ["application/json"] as String[] }
+  def discovery = Mock(Discovery) {
+    getCodecsForService(_) >> { ["application/json"] as String[] }
+  }
+  def codecs = new JsonOnlyCodecs()
+
+  Muon muon = Mock(Muon) {
+    getCodecs() >> codecs
+    getDiscovery() >> discovery
+    getConfiguration() >> new AutoConfiguration()
+  }
+
+  def "sends ACK if the publisher does exist on SUBSCRIBE"() {
+    def subscription = Mock(Subscription)
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        args[0].onSubscribe(subscription)
+      }
     }
-    def codecs = new JsonOnlyCodecs()
+    def config = new AutoConfiguration(serviceName: "awesome")
 
-    Muon muon = Mock(Muon) {
-      getCodecs() >> codecs
-      getDiscovery() >> discovery
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(
+        new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
     }
+    def function = Mock(ChannelConnection.ChannelFunction)
 
-    def "sends ACK if the publisher does exist on SUBSCRIBE"() {
-        def subscription = Mock(Subscription)
-        def pub = Mock(Publisher) {
-            subscribe(_) >> { args ->
-                args[0].onSubscribe(subscription)
-            }
-        }
-        def config = new AutoConfiguration(serviceName: "awesome")
+    def channel = channel(publookup)
+    channel.receive(function)
 
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher("simpleStream") >> Optional.of(
-                    new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
+    when: "SUBSCRIBE from client"
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.SUBSCRIBE)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+        .buildInbound())
 
-        def channel = channel(publookup)
-        channel.receive(function)
+    sleep 200
+    then: "ACK sent back"
+    1 * function.apply({ MuonMessage msg ->
+      msg.step == ProtocolMessages.ACK
+    })
+  }
 
-        when: "SUBSCRIBE from client"
-        channel.send(
-                MuonMessageBuilder
-                        .fromService("tombola")
-                        .toService("awesome")
-                        .step(ProtocolMessages.SUBSCRIBE)
-                        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                        .contentType("application/json")
-                        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                        .buildInbound())
 
-        then: "ACK sent back"
-        1 * function.apply({ MuonMessage msg ->
-            msg.step == ProtocolMessages.ACK
-        })
+  def "sends NACK if the publisher doesn't exist on SUBSCRIBE"() {
+
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher(_) >> Optional.empty()
     }
+    def function = Mock(ChannelConnection.ChannelFunction)
+    def config = new AutoConfiguration(serviceName: "awesome")
 
+    def channel = channel(publookup)
+    channel.receive(function)
 
-    def "sends NACK if the publisher doesn't exist on SUBSCRIBE"() {
+    when: "SUBSCRIBE from client"
+    channel.send(MuonMessageBuilder
+      .fromService("tombola")
+      .toService("awesome")
+      .step(ProtocolMessages.SUBSCRIBE)
+      .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+      .contentType("application/json")
+      .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+      .buildInbound())
 
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
-        def config = new AutoConfiguration(serviceName: "awesome")
+    then: "NACK sent back"
+    _ * function.apply({ MuonMessage msg ->
+      msg.step == ProtocolMessages.NACK
+    })
+  }
 
-        def channel = channel(publookup)
-        channel.receive(function)
-
-        when: "SUBSCRIBE from client"
-        channel.send(MuonMessageBuilder
-                .fromService("tombola")
-                .toService("awesome")
-                .step(ProtocolMessages.SUBSCRIBE)
-                .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                .contentType("application/json")
-                .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                .buildInbound())
-
-        then: "NACK sent back"
-        _ * function.apply({ MuonMessage msg ->
-            msg.step == ProtocolMessages.NACK
-        })
+  def "on receive REQUEST call subscription.request"() {
+    def subscription = Mock(Subscription)
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        args[0].onSubscribe(subscription)
+      }
     }
+    def config = new AutoConfiguration(serviceName: "awesome")
 
-    def "on receive REQUEST call subscription.request"() {
-        def subscription = Mock(Subscription)
-        def pub = Mock(Publisher) {
-            subscribe(_) >> { args ->
-                args[0].onSubscribe(subscription)
-            }
-        }
-        def config = new AutoConfiguration(serviceName: "awesome")
-
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
-
-        def channel = channel(publookup)
-        channel.receive(function)
-
-        when: "SUBSCRIBE from client"
-        channel.send(MuonMessageBuilder
-                .fromService("tombola")
-                .toService("awesome")
-                .step(ProtocolMessages.SUBSCRIBE)
-                .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                .contentType("application/json")
-                .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                .buildInbound())
-
-        channel.send(
-                MuonMessageBuilder
-                        .fromService("tombola")
-                        .toService("awesome")
-                        .step(ProtocolMessages.REQUEST)
-                        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                        .contentType("application/json")
-                        .payload(new GsonCodec().encode(new RequestMessage(100)))
-                        .buildInbound())
-
-        then:
-        1 * subscription.request(100)
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
     }
+    def function = Mock(ChannelConnection.ChannelFunction)
 
-    def "on receive CANCEL call subscription.cancel"() {
-        def subscription = Mock(Subscription)
-        def pub = Mock(Publisher) {
-            subscribe(_) >> { args ->
-                args[0].onSubscribe(subscription)
-            }
-        }
-        def config = new AutoConfiguration(serviceName: "awesome")
+    def channel = channel(publookup)
+    channel.receive(function)
 
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
+    when: "SUBSCRIBE from client"
+    channel.send(MuonMessageBuilder
+      .fromService("tombola")
+      .toService("awesome")
+      .step(ProtocolMessages.SUBSCRIBE)
+      .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+      .contentType("application/json")
+      .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+      .buildInbound())
 
-        def channel = channel(publookup)
-        channel.receive(function)
+    sleep 100
 
-        when: "SUBSCRIBE from client"
-        channel.send(
-                MuonMessageBuilder
-                        .fromService("tombola")
-                        .toService("awesome")
-                        .step(ProtocolMessages.SUBSCRIBE)
-                        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                        .contentType("application/json")
-                        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                        .buildInbound())
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.REQUEST)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode(new RequestMessage(100)))
+        .buildInbound())
 
-        channel.send(
-                MuonMessageBuilder
-                        .fromService("tombola")
-                        .toService("awesome")
-                        .step(ProtocolMessages.CANCEL)
-                        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                        .contentType("application/json")
-                        .payload(new GsonCodec().encode([:]))
-                        .buildInbound())
+    sleep 100
 
-        then:
-        1 * subscription.cancel()
+    then:
+    1 * subscription.request(100)
+  }
+
+  def "on receive CANCEL call subscription.cancel"() {
+    def subscription = Mock(Subscription)
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        args[0].onSubscribe(subscription)
+      }
     }
+    def config = new AutoConfiguration(serviceName: "awesome")
 
-    def "calling subscriber onNext causes a DATA message to dispatch"() {
-        Subscriber subscriber
-        def pub = Mock(Publisher) {
-            subscribe(_) >> { args ->
-                subscriber = args[0]
-            }
-        }
-        def config = new AutoConfiguration(serviceName: "awesome")
-
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
-
-        def channel = channel(publookup)
-        channel.receive(function)
-
-        when: "SUBSCRIBE from client"
-        channel.send(
-                MuonMessageBuilder
-                .fromService("tombola")
-                .toService("awesome")
-                .step(ProtocolMessages.SUBSCRIBE)
-                .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                .contentType("application/json")
-                .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                .buildInbound())
-
-        and: "subscriber.onNext is called"
-        subscriber.onNext([simple:"message"])
-
-        then:
-        1 * function.apply({ MuonMessage msg ->
-            msg.step == ProtocolMessages.DATA &&
-                    msg.channelOperation == MuonMessage.ChannelOperation.normal &&
-                    msg.targetServiceName == "tombola"
-        })
-        //TODO, verify data/ codec usage
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
     }
+    def function = Mock(ChannelConnection.ChannelFunction)
 
-    def "calling onComplete causes a COMPLETE message to dispatch"() {
-        Subscriber subscriber
-        def pub = Mock(Publisher) {
-            subscribe(_) >> { args ->
-                subscriber = args[0]
-            }
-        }
-        def config = new AutoConfiguration(serviceName: "awesome")
+    def channel = channel(publookup)
+    channel.receive(function)
 
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
+    when: "SUBSCRIBE from client"
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.SUBSCRIBE)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+        .buildInbound())
 
-        def channel = channel(publookup)
-        channel.receive(function)
+    sleep 100
 
-        when: "SUBSCRIBE from client"
-        channel.send(
-                MuonMessageBuilder
-                        .fromService("tombola")
-                        .toService("awesome")
-                        .step(ProtocolMessages.SUBSCRIBE)
-                        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                        .contentType("application/json")
-                        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                        .buildInbound())
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.CANCEL)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode([:]))
+        .buildInbound())
 
-        and: "subscriber.onNext is called"
-        subscriber.onComplete()
+    sleep 100
 
-        then:
-        1 * function.apply({ MuonMessage msg ->
-            msg.step == ProtocolMessages.COMPLETE &&
-                    msg.channelOperation == MuonMessage.ChannelOperation.closed &&
-                    msg.targetServiceName == "tombola"
-        })
+    then:
+    1 * subscription.cancel()
+  }
+
+  def "calling subscriber onNext causes a DATA message to dispatch"() {
+    Subscriber subscriber
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        subscriber = args[0]
+      }
     }
+    def config = new AutoConfiguration(serviceName: "awesome")
 
-    def "calling onError causes a ERROR message to dispatch"() {
-        Subscriber subscriber
-        def pub = Mock(Publisher) {
-            subscribe(_) >> { args ->
-                subscriber = args[0]
-            }
-        }
-        def config = new AutoConfiguration(serviceName: "awesome")
-
-        def publookup = Mock(PublisherLookup) {
-            lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
-            lookupPublisher(_) >> Optional.empty()
-        }
-        def function = Mock(ChannelConnection.ChannelFunction)
-
-        def channel = channel(publookup)
-        channel.receive(function)
-
-        when: "SUBSCRIBE from client"
-        channel.send(
-                MuonMessageBuilder
-                        .fromService("tombola")
-                        .toService("awesome")
-                        .step(ProtocolMessages.SUBSCRIBE)
-                        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                        .contentType("application/json")
-                        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
-                        .buildInbound())
-
-        and: "subscriber.onError is called"
-        subscriber.onError(new IllegalStateException("Messed up"))
-
-        then:
-        1 * function.apply({ MuonMessage msg ->
-            msg.step == ProtocolMessages.ERROR &&
-            msg.channelOperation == MuonMessage.ChannelOperation.closed &&
-                    msg.targetServiceName == "tombola"
-        })
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
     }
+    def function = Mock(ChannelConnection.ChannelFunction)
+
+    def channel = channel(publookup)
+    channel.receive(function)
+
+    when: "SUBSCRIBE from client"
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.SUBSCRIBE)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+        .buildInbound())
+
+    sleep 100
+
+    and: "subscriber.onNext is called"
+    subscriber.onNext([simple: "message"])
+
+    then:
+    1 * function.apply({ MuonMessage msg ->
+      msg.step == ProtocolMessages.DATA &&
+        msg.channelOperation == MuonMessage.ChannelOperation.normal &&
+        msg.targetServiceName == "tombola"
+    })
+    //TODO, verify data/ codec usage
+  }
+
+  def "calling onComplete causes a COMPLETE message to dispatch"() {
+    Subscriber subscriber
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        subscriber = args[0]
+      }
+    }
+    def config = new AutoConfiguration(serviceName: "awesome")
+
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
+    }
+    def function = Mock(ChannelConnection.ChannelFunction)
+
+    def channel = channel(publookup)
+    channel.receive(function)
+
+    when: "SUBSCRIBE from client"
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.SUBSCRIBE)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+        .buildInbound())
+
+    sleep 100
+
+    and: "subscriber.onNext is called"
+    subscriber.onComplete()
+
+    then:
+    1 * function.apply({ MuonMessage msg ->
+      msg.step == ProtocolMessages.COMPLETE &&
+        msg.channelOperation == MuonMessage.ChannelOperation.closed &&
+        msg.targetServiceName == "tombola"
+    })
+  }
+
+  def "calling onError causes a ERROR message to dispatch"() {
+    Subscriber subscriber
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        subscriber = args[0]
+      }
+    }
+    def config = new AutoConfiguration(serviceName: "awesome")
+
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
+    }
+    def function = Mock(ChannelConnection.ChannelFunction)
+
+    def channel = channel(publookup)
+    channel.receive(function)
+
+    when: "SUBSCRIBE from client"
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.SUBSCRIBE)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode(new ReactiveStreamSubscriptionRequest("simpleStream")))
+        .buildInbound())
+
+    sleep 100
+
+    and: "subscriber.onError is called"
+    subscriber.onError(new IllegalStateException("Messed up"))
+
+    then:
+    1 * function.apply({ MuonMessage msg ->
+      msg.step == ProtocolMessages.ERROR &&
+        msg.channelOperation == MuonMessage.ChannelOperation.closed &&
+        msg.targetServiceName == "tombola"
+    })
+  }
 
   def channel(PublisherLookup lookup) {
     new ReactiveStreamServerStack(lookup, muon.codecs, muon.configuration, muon.discovery).createChannel()
