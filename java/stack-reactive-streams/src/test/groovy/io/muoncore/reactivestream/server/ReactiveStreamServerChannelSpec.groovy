@@ -11,6 +11,7 @@ import io.muoncore.message.MuonMessageBuilder
 import io.muoncore.protocol.reactivestream.ProtocolMessages
 import io.muoncore.protocol.reactivestream.messages.ReactiveStreamSubscriptionRequest
 import io.muoncore.protocol.reactivestream.messages.RequestMessage
+import io.muoncore.protocol.reactivestream.server.DefaultPublisherLookup
 import io.muoncore.protocol.reactivestream.server.ImmediatePublisherGenerator
 import io.muoncore.protocol.reactivestream.server.PublisherLookup
 import io.muoncore.protocol.reactivestream.server.ReactiveStreamJSServerStack
@@ -30,6 +31,7 @@ class ReactiveStreamServerChannelSpec extends Specification {
 
     Muon muon = Mock(Muon) {
       getCodecs() >> codecs
+      getDiscovery() >> discovery
     }
 
     def "sends ACK if the publisher does exist on SUBSCRIBE"() {
@@ -303,6 +305,6 @@ class ReactiveStreamServerChannelSpec extends Specification {
     }
 
   def channel(PublisherLookup lookup) {
-    new ReactiveStreamJSServerStack(muon, lookup).createChannel()
+    new ReactiveStreamServerStack(lookup, muon.codecs, muon.configuration, muon.discovery).createChannel()
   }
 }
