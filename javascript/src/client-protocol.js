@@ -27,7 +27,7 @@ module.exports.create = function(
     targetService,
     localService,
     targetStream,
-    args) {
+    args, auth) {
 
     if (! args) args = {};
 
@@ -74,6 +74,7 @@ module.exports.create = function(
         start: function() {
             logger.debug("Stream subscription requested!")
             var msg = messages.muonMessage({
+                auth: auth,
                 streamName: targetStream,
                 args: args
             }, localService, targetService, "reactive-stream", "SubscriptionRequested")

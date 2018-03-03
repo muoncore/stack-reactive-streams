@@ -9,6 +9,7 @@ import io.muoncore.exception.MuonException;
 import io.muoncore.message.MuonInboundMessage;
 import io.muoncore.message.MuonMessageBuilder;
 import io.muoncore.message.MuonOutboundMessage;
+import io.muoncore.protocol.Auth;
 import io.muoncore.protocol.reactivestream.ProtocolMessages;
 import io.muoncore.protocol.reactivestream.messages.ReactiveStreamSubscriptionRequest;
 import io.muoncore.protocol.reactivestream.messages.RequestMessage;
@@ -37,7 +38,7 @@ public class ReactiveStreamClientProtocol {
                                         Subscriber<StreamData> subscriber,
                                         Codecs codecs,
                                         AutoConfiguration configuration,
-                                        Discovery discovery) {
+                                        Discovery discovery, Auth auth) {
         this.uri = uri;
         this.transportConnection = transportConnection;
         this.subscriber = subscriber;

@@ -16,8 +16,8 @@ exports.create = function(muon) {
 
   muon.addServerStack(api)
 
-  muon.subscribe = function (remoteurl, params, callback, errorCallback, completeCallback) {
-    return api.subscribe(remoteurl, params, callback, errorCallback, completeCallback);
+  muon.subscribe = function (remoteurl, auth, params, callback, errorCallback, completeCallback) {
+    return api.subscribe(remoteurl, auth, params, callback, errorCallback, completeCallback);
   }
 }
 
@@ -31,7 +31,7 @@ exports.getApi = function (name, infra) {
         endpoints: function () {
           return [];
         },
-        subscribe: function (remoteServiceUrl, params, clientCallback, errorCallback, completeCallback) {
+        subscribe: function (remoteServiceUrl, auth, params, clientCallback, errorCallback, completeCallback) {
             infra.getTransport().then(function(transport) {
                 try {
                     logger.debug("Subscribing to " + remoteServiceUrl + " with params " + JSON.stringify(params))
@@ -46,7 +46,7 @@ exports.getApi = function (name, infra) {
                         targetService,
                         serviceName,
                         targetStream,
-                        args);
+                        args, auth);
                     protocol.start();
                 } catch (e) {
                     logger.error("Error in stream subscription initialisation ", e)

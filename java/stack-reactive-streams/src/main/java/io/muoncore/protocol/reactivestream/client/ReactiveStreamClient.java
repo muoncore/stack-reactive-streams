@@ -2,6 +2,7 @@ package io.muoncore.protocol.reactivestream.client;
 
 import io.muoncore.Muon;
 import io.muoncore.exception.MuonException;
+import io.muoncore.protocol.Auth;
 import lombok.AllArgsConstructor;
 import org.reactivestreams.Subscriber;
 
@@ -11,7 +12,7 @@ import java.net.URI;
 public class ReactiveStreamClient {
   private Muon muon;
 
-  public void subscribe(URI uri, Subscriber<StreamData> subscriber) {
+  public void subscribe(URI uri, Auth auth, Subscriber<StreamData> subscriber) {
     if (!uri.getScheme().equals("stream")) throw new IllegalArgumentException("URI Scheme is invalid. Requires scheme: stream://");
 
     if (muon.getDiscovery().getServiceNamed(uri.getHost()).isPresent()) {
@@ -21,7 +22,7 @@ public class ReactiveStreamClient {
         muon.getTransportClient().openClientChannel(),
         subscriber,
         muon.getCodecs(),
-        muon.getConfiguration(), muon.getDiscovery());
+        muon.getConfiguration(), muon.getDiscovery(), auth);
 
       proto.start();
     } else {
