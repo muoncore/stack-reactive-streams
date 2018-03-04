@@ -10,6 +10,7 @@ import io.muoncore.exception.MuonException
 import io.muoncore.message.MuonMessage
 import io.muoncore.message.MuonMessageBuilder
 import io.muoncore.message.MuonOutboundMessage
+import io.muoncore.protocol.Auth
 import io.muoncore.protocol.reactivestream.ProtocolMessages
 import io.muoncore.protocol.reactivestream.client.ReactiveStreamClientProtocol
 import io.muoncore.protocol.reactivestream.messages.ReactiveStreamSubscriptionRequest
@@ -40,7 +41,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -83,7 +84,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -124,7 +125,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -162,7 +163,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -206,7 +207,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -257,7 +258,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -308,7 +309,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -353,7 +354,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()
@@ -397,7 +398,7 @@ class ReactiveStreamClientProtocolSpec extends Specification {
                 connection,
                 sub,
                 codecs,
-                config, discovery)
+                config, discovery, new Auth())
 
         when:
         client.start()

@@ -32,6 +32,7 @@ public class ReactiveStreamClientProtocol {
     private AutoConfiguration configuration;
     private Codecs codecs;
     private Discovery discovery;
+    private Auth auth;
 
     public ReactiveStreamClientProtocol(URI uri,
                                         ChannelConnection<MuonOutboundMessage, MuonInboundMessage> transportConnection,
@@ -45,12 +46,13 @@ public class ReactiveStreamClientProtocol {
         this.codecs = codecs;
         this.configuration = configuration;
         this.discovery = discovery;
+        this.auth = auth;
     }
 
     public void start()  {
         transportConnection.receive(this::handleMessage);
 
-        ReactiveStreamSubscriptionRequest request = new ReactiveStreamSubscriptionRequest(uri.getPath());
+        ReactiveStreamSubscriptionRequest request = new ReactiveStreamSubscriptionRequest(uri.getPath(), auth);
 
         splitQuery(uri).forEach(request::arg);
 

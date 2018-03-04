@@ -8,6 +8,7 @@ import io.muoncore.liblib.reactor.rx.broadcast.Broadcaster
 import io.muoncore.memory.discovery.InMemDiscovery
 import io.muoncore.memory.transport.InMemTransport
 import io.muoncore.memory.transport.bus.EventBus
+import io.muoncore.protocol.Auth
 import io.muoncore.protocol.reactivestream.client.ReactiveStreamClient
 import io.muoncore.protocol.reactivestream.server.PublisherLookup
 import io.muoncore.protocol.reactivestream.server.ReactiveStreamServer
@@ -39,7 +40,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
     muon1.publishSource("somedata", PublisherLookup.PublisherType.HOT, b)
 
     when:
-    muon2.subscribe(new URI("stream://simples/somedata"), sub2)
+    muon2.subscribe(new URI("stream://simples/somedata"), new Auth(), sub2)
 
     sleep(100)
 
@@ -79,7 +80,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
     def muon2 = client("tombola")
 
     when:
-    muon2.subscribe(new URI("stream://simples/BADSTREAM"), sub)
+    muon2.subscribe(new URI("stream://simples/BADSTREAM"), new Auth(), sub)
 
     then:
     new PollingConditions(timeout: 10).eventually {
@@ -107,7 +108,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
 
     sleep(4000)
     when:
-    muon2.subscribe(new URI("stream://simples/somedata"), sub2)
+    muon2.subscribe(new URI("stream://simples/somedata"), new Auth(), sub2)
 
     sleep(1000)
 
@@ -188,7 +189,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
 
     sleep 500
     when:
-    muon2.subscribe(new URI("stream://simples/somedata"), sub)
+    muon2.subscribe(new URI("stream://simples/somedata"), new Auth(), sub)
 
     then:
 
