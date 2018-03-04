@@ -257,7 +257,7 @@ class ReactiveStreamIntegrationSpec extends Specification {
 
     sleep 500
     when:
-    muon2.subscribe(new URI("stream://simples/somedata"), sub)
+    muon2.subscribe(new URI("stream://simples/somedata"), new Auth(), sub)
 
     sleep(500)
     muon2transport.triggerFailure()
