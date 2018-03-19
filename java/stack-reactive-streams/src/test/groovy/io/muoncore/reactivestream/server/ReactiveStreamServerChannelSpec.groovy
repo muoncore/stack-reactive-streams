@@ -32,6 +32,48 @@ class ReactiveStreamServerChannelSpec extends Specification {
     getConfiguration() >> new AutoConfiguration()
   }
 
+  def "sends NACK and logs if the message is not parseable"() {
+    def subscription = Mock(Subscription)
+    def pub = Mock(Publisher) {
+      subscribe(_) >> { args ->
+        args[0].onSubscribe(subscription)
+      }
+    }
+    def config = new AutoConfiguration(serviceName: "awesome")
+
+    def publookup = Mock(PublisherLookup) {
+      lookupPublisher("simpleStream") >> Optional.of(
+        new PublisherLookup.PublisherRecord("simpleStream", PublisherLookup.PublisherType.HOT, new ImmediatePublisherGenerator(pub)))
+      lookupPublisher(_) >> Optional.empty()
+    }
+    def function = Mock(ChannelConnection.ChannelFunction)
+
+    def channel = channel(publookup)
+    channel.receive(function)
+
+    when: "SUBSCRIBE from client"
+    channel.send(
+      MuonMessageBuilder
+        .fromService("tombola")
+        .toService("awesome")
+        .step(ProtocolMessages.SUBSCRIBE)
+        .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+        .contentType("application/json")
+        .payload(new GsonCodec().encode([
+                streamName: "awesome",
+                auth: [
+                        token: ["first": "broken"]
+                ]
+        ]))
+        .buildInbound())
+
+    sleep 200
+    then: "NACK sent back"
+    _ * function.apply({ MuonMessage msg ->
+      msg.step == ProtocolMessages.NACK
+    })
+  }
+
   def "sends ACK if the publisher does exist on SUBSCRIBE"() {
     def subscription = Mock(Subscription)
     def pub = Mock(Publisher) {

@@ -13,6 +13,7 @@ import io.muoncore.protocol.reactivestream.ProtocolMessages;
 import io.muoncore.protocol.reactivestream.messages.ReactiveStreamSubscriptionRequest;
 import io.muoncore.protocol.reactivestream.messages.RequestMessage;
 import io.muoncore.transport.TransportEvents;
+import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -20,6 +21,7 @@ import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+@Slf4j
 public class ReactiveStreamServerChannel implements ChannelConnection<MuonInboundMessage, MuonOutboundMessage> {
 
     private PublisherLookup publisherLookup;
@@ -149,66 +151,72 @@ public class ReactiveStreamServerChannel implements ChannelConnection<MuonInboun
     @SuppressWarnings("unchecked")
     private void handleSubscribe(MuonInboundMessage msg) {
 
-        ReactiveStreamSubscriptionRequest subscriptionMessage  = codecs.decode(msg.getPayload(), msg.getContentType(), ReactiveStreamSubscriptionRequest.class);
+      try {
+        ReactiveStreamSubscriptionRequest subscriptionMessage = codecs.decode(msg.getPayload(), msg.getContentType(), ReactiveStreamSubscriptionRequest.class);
 
         Optional<PublisherLookup.PublisherRecord> pub = publisherLookup.lookupPublisher(subscriptionMessage.getStreamName());
 
         if (!pub.isPresent()) {
-            sendNack(msg);
+          sendNack(msg);
         } else {
-            acceptedContentTypes = Arrays.asList(discovery.getCodecsForService(msg.getSourceServiceName()));
-            subscribingServiceName = msg.getSourceServiceName();
+          acceptedContentTypes = Arrays.asList(discovery.getCodecsForService(msg.getSourceServiceName()));
+          subscribingServiceName = msg.getSourceServiceName();
 
-            pub.get().getPublisher().generatePublisher(subscriptionMessage).subscribe(new Subscriber() {
-                @Override
-                public void onSubscribe(Subscription s) {
-                    subscription = s;
-                    sendAck(msg);
-                }
+          pub.get().getPublisher().generatePublisher(subscriptionMessage).subscribe(new Subscriber() {
+            @Override
+            public void onSubscribe(Subscription s) {
+              subscription = s;
+              sendAck(msg);
+            }
 
-                @Override
-                public void onNext(Object o) {
-                    Codecs.EncodingResult result = codecs.encode(o, acceptedContentTypes.toArray(new String[0]));
+            @Override
+            public void onNext(Object o) {
+              Codecs.EncodingResult result = codecs.encode(o, acceptedContentTypes.toArray(new String[0]));
 
-                    function.apply(MuonMessageBuilder
-                            .fromService(configuration.getServiceName())
-                            .step(ProtocolMessages.DATA)
-                            .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                            .toService(subscribingServiceName)
-                            .payload(result.getPayload())
-                            .contentType(result.getContentType())
-                            .build()
-                    );
-                }
+              function.apply(MuonMessageBuilder
+                .fromService(configuration.getServiceName())
+                .step(ProtocolMessages.DATA)
+                .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+                .toService(subscribingServiceName)
+                .payload(result.getPayload())
+                .contentType(result.getContentType())
+                .build()
+              );
+            }
 
-                @Override
-                public void onError(Throwable t) {
+            @Override
+            public void onError(Throwable t) {
 
-                    Map<String, String> meta = new HashMap<>();
-                    meta.put("error", t.getMessage());
+              Map<String, String> meta = new HashMap<>();
+              meta.put("error", t.getMessage());
 
-                    Codecs.EncodingResult result = codecs.encode(meta,
-                            discovery.getCodecsForService(msg.getSourceServiceName()));
+              Codecs.EncodingResult result = codecs.encode(meta,
+                discovery.getCodecsForService(msg.getSourceServiceName()));
 
-                    function.apply(MuonMessageBuilder
-                            .fromService(configuration.getServiceName())
-                            .step(ProtocolMessages.ERROR)
-                            .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
-                            .toService(subscribingServiceName)
-                            .payload(result.getPayload())
-                            .contentType(result.getContentType())
-                            .operation(MuonMessage.ChannelOperation.closed)
-                            .build()
-                    );
+              function.apply(MuonMessageBuilder
+                .fromService(configuration.getServiceName())
+                .step(ProtocolMessages.ERROR)
+                .protocol(ReactiveStreamServerStack.REACTIVE_STREAM_PROTOCOL)
+                .toService(subscribingServiceName)
+                .payload(result.getPayload())
+                .contentType(result.getContentType())
+                .operation(MuonMessage.ChannelOperation.closed)
+                .build()
+              );
 
-                }
+            }
 
-                @Override
-                public void onComplete() {
-                    sendComplete();
-                }
-            });
+            @Override
+            public void onComplete() {
+              sendComplete();
+            }
+          });
         }
+      } catch (Exception  e) {
+        log.info("Could not ACK RS Subscribe due to an unexpected error, the client probably sent an unparseable message payload", e);
+        log.info("Payload: " + codecs.decode(msg.getPayload(), msg.getContentType(), Map.class));
+        sendNack(msg);
+      }
     }
 
     private void sendComplete() {
